@@ -1,0 +1,50 @@
+# Source files
+src/
+tsconfig.json
+tsconfig.test.json
+vitest.config.ts
+
+# Tests
+tests/
+*.test.ts
+*.spec.ts
+
+# Example
+example/
+
+# Documentation (keep README.md in package)
+CONTRIBUTING.md
+SUMMARY.md
+docs/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary
+*.tmp
+*.temp
+.cache/
