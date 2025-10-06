@@ -1,6 +1,6 @@
 {
   "name": "zero-mcp",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Zero-boilerplate, lightweight and fast MCP server toolkit. Skip the weight of `@modelcontextprotocol/sdk` and start shipping MCP servers in minutes with minimal code.",
   "type": "module",
   "main": "./dist/index.js",

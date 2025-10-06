@@ -4,22 +4,27 @@
 
 ## Why Zero MCP instead of the official SDK?
 
-| Topic                  | Zero MCP                                                         | `@modelcontextprotocol/sdk`                                                                             |
-| ---------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| Installation footprint | 2 runtime deps (`zod`, `zod-to-json-schema`) – nothing else        | Ships 12 direct dependencies including Express, CORS, rate limiting, EventSource, PKCE, etc.            |
-| Default transport      | Native `node:http` server with JSON-RPC endpoints                  | Multiple transports (stdio, HTTP, SSE) implemented on top of Express & supporting packages              |
-| Tool schemas           | Built-in Zod tooling with automatic JSON Schema emission           | Requires wiring schemas into `registerTool` manually (no Zod helper layer)                              |
-| Observability          | Lifecycle hooks for connections, tool calls, errors out of the box | Requires custom event wiring per transport                                                              |
-| Boilerplate to start   | Instantiate `McpServer`, register tools, call `start()`            | Official quick start builds an Express app, manages transports, and handles streaming sessions manually |
-| Focus                  | Minimal server implementation for MCP tools API over HTTP          | Full spec implementation (clients, prompts, auth, transports) – heavier when you only need tools        |
+The official `@modelcontextprotocol/sdk` ships with **significant overhead**—both in dependencies and performance—while implementing features most developers never use and missing critical conveniences. Zero MCP takes the opposite approach: minimal dependencies, faster cold starts, and ergonomics that get you shipping in minutes.
 
-Keep the official SDK for large deployments or full MCP surface area. Reach for Zero MCP when you want:
+**What's wrong with the official SDK?**
 
-- A tiny package that respects disk and cold-start budgets.
-- Zod-first ergonomics without extra wrappers.
-- Drop-in hooks for instrumentation and logging.
-- A simple HTTP endpoint that plays nicely with reverse proxies, serverless functions, and edge runtimes.
-- Spec-aligned CORS guard so browser MCP clients connect safely without extra middleware.
+- **Dependency bloat** – Bundles 12+ packages (Express, CORS middleware, rate limiting, EventSource polyfills, PKCE utilities) even for simple tool servers
+- **Performance overhead** – Express-based transport stack adds latency and memory footprint versus native `node:http`
+- **Boilerplate hell** – Requires manual Express app setup, transport wiring, session management, and schema registration for every server
+- **Missing conveniences** – No Zod integration, no built-in lifecycle hooks, no automatic JSON Schema generation
+- **Feature bloat** – Ships stdio transports, SSE streaming, client implementations, and auth flows that 80% of tool servers never touch
+
+**What Zero MCP delivers instead:**
+
+- **2 dependencies total** – Just `zod` and `zod-to-json-schema`; nothing else pollutes your `node_modules`
+- **Native performance** – Built-in `node:http` server with zero middleware overhead; ideal for serverless and edge runtimes
+- **Instant start** – Instantiate `McpServer`, register tools, call `start()`—no Express config or transport plumbing
+- **Zod-first schemas** – Define tool inputs with Zod; JSON Schema generation happens automatically
+- **Built-in observability** – Lifecycle hooks for connections, tool calls, and errors work out of the box
+- **Production-ready CORS** – Spec-aligned origin validation included for browser MCP clients
+- **Focused scope** – Does one thing well: MCP tools over HTTP
+
+Choose the official SDK if you need the full MCP spec (stdio transports, prompts API, auth flows). Choose Zero MCP when you want a fast, lean tool server without the baggage.
 
 ## Installation
 
@@ -39,24 +44,22 @@ const server = new McpServer({
   version: '1.0.0',
 });
 
-const addSchema = z.object({
-  a: z.number().describe('First addend'),
-  b: z.number().describe('Second addend'),
-});
-
-const add: ToolDefinition<typeof addSchema> = {
+server.tool({
   name: 'add',
-  description: 'Add two numbers',
-  schema: addSchema,
-  handler: async ({ a, b }) => [
-    {
-      type: 'text',
-      text: `Result: ${a + b}`,
-    },
-  ],
-};
-
-server.tool(add);
+  description: 'Simple addition tool.',
+  schema: z.object({
+    a: z.number().describe('First addend'),
+    b: z.number().describe('Second addend'),
+  }),
+  handler: async ({ a, b }) => {
+    return [
+      {
+        type: 'text',
+        text: `The sum of ${a} and ${b} is ${a + b}.`,
+      },
+    ];
+  },
+});
 
 await server.start({
   host: '127.0.0.1',
@@ -116,7 +119,7 @@ const server = new McpServer({
 
 ## Example project
 
-A runnable weather server lives in `example/`. Run it locally with:
+A runnable weather server lives in [`example/`](https://github.com/SNIKO/zero-mcp/tree/main/example). Run it locally with:
 
 ```bash
 npm run example
