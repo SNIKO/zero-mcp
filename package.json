@@ -13,11 +13,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zero-mcp/zero-mcp.git"
+    "url": "git+https://github.com/SNIKO/zero-mcp.git"
   },
-  "homepage": "https://github.com/zero-mcp/zero-mcp#readme",
+  "homepage": "https://github.com/SNIKO/zero-mcp#readme",
   "bugs": {
-    "url": "https://github.com/zero-mcp/zero-mcp/issues"
+    "url": "https://github.com/SNIKO/zero-mcp/issues"
   },
   "files": [
     "dist"
