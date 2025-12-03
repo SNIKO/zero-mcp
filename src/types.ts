@@ -1,4 +1,5 @@
 import { z, type ZodTypeAny } from 'zod';
+import type { IncomingMessage } from 'node:http';
 
 export interface TextToolResponse {
   type: 'text';
@@ -15,7 +16,14 @@ export type ToolResponseContent = TextToolResponse | MediaToolResponse;
 
 export type ToolInput = Record<string, unknown>;
 
-export type ToolHandler<T> = (input: T) => ToolResponseContent[] | Promise<ToolResponseContent[]>;
+export interface ToolContext {
+  request: IncomingMessage;
+}
+
+export type ToolHandler<T> = (
+  input: T,
+  context?: ToolContext,
+) => ToolResponseContent[] | Promise<ToolResponseContent[]>;
 
 /**
  * Declarative description of a Model Context Protocol tool. The provided Zod schema

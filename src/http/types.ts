@@ -1,5 +1,23 @@
 import { z } from 'zod';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import { ServerHooks } from '../types';
+
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD';
+
+export type RouteHandler = (
+  req: IncomingMessage,
+  res: ServerResponse,
+) => void | Promise<void>;
+
+/**
+ * The middleware receives raw request and response objects and must return a boolean:
+ * - Return `true` to allow the request to proceed
+ * - Return `false` to deny the request (middleware must write the response with status code and message)
+ */
+export type Middleware = (
+  req: IncomingMessage,
+  res: ServerResponse,
+) => boolean | Promise<boolean>;
 
 /**
  * Configuration options for the HTTP transport.
@@ -8,6 +26,10 @@ import { ServerHooks } from '../types';
  * @property {number} port - The port number for the HTTP transport. Default is 3000.
  * @property {string} host - The hostname for the HTTP transport. Default is "localhost".
  * @property {string} path - The path for the HTTP transport. Default is "/mcp".
+ * @property {ServerHooks} hooks - Optional server hooks for lifecycle events.
+ * @property {string[] | '*'} allowedOrigins - CORS allowed origins. Default is '*'.
+ * @property {Map<string, Map<HttpMethod, RouteHandler>>} customRoutes - Custom HTTP routes.
+ * @property {Middleware} authMiddleware - Optional authentication middleware for MCP endpoints. If not provided, no auth is performed.
  *
  * @constant {HttpTransportConfig} DEFAULT_HTTP_TRANSPORT_CONFIG
  * @description The default configuration for the HTTP transport.
@@ -22,6 +44,8 @@ export interface HttpTransportOptions {
   path?: string;
   hooks?: ServerHooks;
   allowedOrigins?: string[] | '*';
+  customRoutes?: Map<string, Map<HttpMethod, RouteHandler>>;
+  authMiddleware?: Middleware;
 }
 
 export const DEFAULT_HTTP_TRANSPORT_OPTIONS: HttpTransportOptions = {

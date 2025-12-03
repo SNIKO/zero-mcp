@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { ZodError } from 'zod';
 
 import type { McpServer } from '../server.js';
-import type { ToolInput, ToolResponseContent } from '../types.js';
+import type { ToolInput, ToolResponseContent, ToolContext } from '../types.js';
 import {
   readRequestBody,
   sendError,
@@ -18,6 +18,8 @@ import {
   ErrorCode,
   type CallToolParams,
   type JsonRpcRequest,
+  type HttpMethod,
+  type RouteHandler,
 } from './types.js';
 
 export class HttpTransport {
@@ -78,7 +80,70 @@ export class HttpTransport {
       return;
     }
 
-    if (!this.canHandle(req, res)) {
+    if (req.method === 'OPTIONS') {
+      this.sendPreflightResponse(req, res);
+      return;
+    }
+
+    const requestPath = (req.url ?? '').split('?')[0];
+
+    // Check if this is a custom route
+    if (this.options.customRoutes) {
+      const methodMap = this.options.customRoutes.get(requestPath);
+      if (methodMap) {
+        await this.handleCustomRoute(req, res, methodMap);
+        return;
+      }
+    }
+
+    // Check if this is an MCP request
+    if (!this.options.path || requestPath === this.options.path) {
+      await this.handleMcpRequest(req, res);
+      return;
+    }
+
+    // No matching route found
+    sendError(res, 404, 'Not found');
+  }
+
+  private async handleCustomRoute(
+    req: IncomingMessage,
+    res: ServerResponse,
+    methodMap: Map<HttpMethod, RouteHandler>,
+  ): Promise<void> {
+    const method = (req.method ?? '').toUpperCase() as HttpMethod;
+    const handler = methodMap.get(method);
+
+    if (!handler) {
+      res.setHeader('Allow', Array.from(methodMap.keys()).join(', '));
+      sendError(res, 405, 'Method not allowed');
+      return;
+    }
+
+    try {
+      await handler(req, res);
+    } catch (error) {
+      const normalizedError = error instanceof Error ? error : new Error(String(error));
+      this.options.hooks?.onServerError?.(normalizedError);
+
+      if (res.writableEnded) {
+        return;
+      }
+
+      if (res.headersSent) {
+        res.end();
+        return;
+      }
+
+      sendError(res, 500, 'Internal server error');
+    }
+  }
+
+  private async handleMcpRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    // Only POST method is allowed for MCP requests
+    if (req.method !== 'POST') {
+      res.setHeader('Allow', 'POST, OPTIONS');
+      sendError(res, 405, 'Method not allowed');
       return;
     }
 
@@ -88,15 +153,26 @@ export class HttpTransport {
       const parsedRequest = await readRequestBody(req);
       requestId = parsedRequest.id ?? null;
 
+      
+      if (this.options.authMiddleware) {
+        const authorized = await this.options.authMiddleware(req, res);
+        if (!authorized) {
+          return;
+        }
+      }
+
       switch (parsedRequest.method) {
         case 'initialize':
           this.handleInitialize(parsedRequest, res);
+          break;
+        case 'notifications/initialized':
+          this.handleInitializedNotification(res);
           break;
         case 'tools/list':
           this.handleToolsList(parsedRequest, res);
           break;
         case 'tools/call':
-          await this.handleToolCall(parsedRequest, res);
+          await this.handleToolCall(parsedRequest, res, req);
           break;
         case 'ping':
           sendJsonRpcResponse(res, requestId, { status: 'ok' });
@@ -114,29 +190,6 @@ export class HttpTransport {
       }
       return;
     }
-  }
-
-  private canHandle(req: IncomingMessage, res: ServerResponse): boolean {
-    if (req.method === 'OPTIONS') {
-      this.sendPreflightResponse(req, res);
-      return false;
-    }
-
-    // Check if the request path matches the configured MCP path, i.e. /mcp by default
-    const requestPath = (req.url ?? '').split('?')[0];
-    if (requestPath !== this.options.path) {
-      sendError(res, 404, 'Not found');
-      return false;
-    }
-
-    // Only POST method is allowed for MCP requests
-    if (req.method !== 'POST') {
-      res.setHeader('Allow', 'POST, OPTIONS');
-      sendError(res, 405, 'Method not allowed');
-      return false;
-    }
-
-    return true;
   }
 
   private normalizeAllowedOrigins(options: HttpTransportOptions): string[] | '*' {
@@ -181,12 +234,10 @@ export class HttpTransport {
       ? requestHeaders.join(', ')
       : requestHeaders ?? 'Content-Type, Accept, Mcp-Session-Id';
 
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', headersValue);
+    const allowedMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
 
-    if (this.allowedOrigins !== '*') {
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-    }
+    res.setHeader('Access-Control-Allow-Methods', allowedMethods.join(', '));
+    res.setHeader('Access-Control-Allow-Headers', headersValue);
 
     res.writeHead(204).end();
   }
@@ -221,6 +272,10 @@ export class HttpTransport {
     });
   }
 
+  private handleInitializedNotification(res: ServerResponse): void {    
+    res.writeHead(202).end();
+  }
+
   private handleToolsList(request: JsonRpcRequest, res: ServerResponse): void {
     this.options.hooks?.onToolsListRequested?.();
     const tools = this.mcpServer.getTools();
@@ -232,7 +287,11 @@ export class HttpTransport {
     sendJsonRpcResponse(res, request.id ?? null, { tools: toolDefinitions });
   }
 
-  private async handleToolCall(request: JsonRpcRequest, res: ServerResponse): Promise<void> {
+  private async handleToolCall(
+    request: JsonRpcRequest,
+    res: ServerResponse,
+    req?: IncomingMessage,
+  ): Promise<void> {
     const params = this.parseToolCallParams(request, res);
     if (!params) {
       return;
@@ -259,8 +318,10 @@ export class HttpTransport {
 
     this.options.hooks?.onToolCallStarted?.(params.name, rawInput);
 
+    const context: ToolContext | undefined = req ? { request: req } : undefined;
+
     try {
-      const result = await tool.handler(parsedInput);
+      const result = await tool.handler(parsedInput, context);
       this.recordToolSuccess(params.name, rawInput, result, start);
       sendJsonRpcResponse(res, requestId, { content: result });
     } catch (error) {

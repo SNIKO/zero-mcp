@@ -13,7 +13,11 @@ export type {
   ToolDefinition,
   ToolHandler,
 } from './types.js';
-export type { HttpTransportOptions } from './http/types.js';
+export type {
+  HttpTransportOptions,
+  HttpMethod,
+  RouteHandler,
+} from './http/types.js';
 export { DEFAULT_HTTP_TRANSPORT_OPTIONS } from './http/types.js';
 
 // Runtime exports

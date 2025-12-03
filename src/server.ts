@@ -1,5 +1,9 @@
 import { HttpTransport } from './http/http-transport.js';
-import { HttpTransportOptions } from './http/types.js';
+import {
+  HttpTransportOptions,
+  HttpMethod,
+  RouteHandler
+} from './http/types.js';
 import type { ZodTypeAny } from 'zod';
 import type { ServerHooks, ToolDefinition } from './types.js';
 
@@ -28,6 +32,7 @@ export class McpServer {
   public readonly version: string;
 
   private readonly _tools = new Map<string, ToolDefinition<ZodTypeAny>>();
+  private readonly _endpoints = new Map<string, Map<HttpMethod, RouteHandler>>();
   private readonly hooks?: ServerHooks;
   private transport?: HttpTransport;
 
@@ -59,6 +64,22 @@ export class McpServer {
     return this;
   }
 
+  route(method: HttpMethod, path: string, handler: RouteHandler): this {
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+
+    if (!this._endpoints.has(normalizedPath)) {
+      this._endpoints.set(normalizedPath, new Map());
+    }
+
+    const methodMap = this._endpoints.get(normalizedPath)!;
+    if (methodMap.has(method)) {
+      throw new Error(`Endpoint '${method} ${normalizedPath}' is already registered`);
+    }
+
+    methodMap.set(method, handler);
+    return this;
+  }
+
   /**
    * Starts the mcp server in Http mode.
    *
@@ -79,7 +100,47 @@ export class McpServer {
       throw new Error('Server is already started');
     }
 
-    const finalOptions = { ...options, hooks: { ...this.hooks, ...options?.hooks } };
+    const mcpPath = options?.path ?? '/mcp';
+
+    // Validate no custom endpoint conflicts with MCP path
+    if (this._endpoints.has(mcpPath)) {
+      throw new Error(`Custom endpoint path cannot match MCP path '${mcpPath}'`);
+    }
+
+    // Merge server endpoints with options endpoints
+    const mergedRoutes = new Map<string, Map<HttpMethod, RouteHandler>>();
+
+    // Copy server endpoints
+    for (const [path, methodMap] of this._endpoints.entries()) {
+      mergedRoutes.set(path, new Map(methodMap));
+    }
+
+    // Merge options endpoints
+    if (options?.customRoutes) {
+      for (const [path, methodMap] of options.customRoutes.entries()) {
+        if (path === mcpPath) {
+          throw new Error(`Custom endpoint path cannot match MCP path '${mcpPath}'`);
+        }
+
+        if (!mergedRoutes.has(path)) {
+          mergedRoutes.set(path, new Map());
+        }
+
+        const targetMethodMap = mergedRoutes.get(path)!;
+        for (const [method, handler] of methodMap.entries()) {
+          if (targetMethodMap.has(method)) {
+            throw new Error(`Endpoint '${method} ${path}' is already registered`);
+          }
+          targetMethodMap.set(method, handler);
+        }
+      }
+    }
+
+    const finalOptions = {
+      ...options,
+      hooks: { ...this.hooks, ...options?.hooks },
+      customRoutes: mergedRoutes,
+    };
 
     this.transport = new HttpTransport(this, finalOptions);
     await this.transport.start();
