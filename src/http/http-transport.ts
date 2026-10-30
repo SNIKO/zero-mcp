@@ -282,7 +282,7 @@ export class HttpTransport {
     const toolDefinitions = tools.map((tool) => ({
       name: tool.name,
       description: tool.description,
-      inputSchema: zodSchemaToToolSchema(tool.name, tool.schema),
+      inputSchema: zodSchemaToToolSchema(tool.schema),
     }));
     sendJsonRpcResponse(res, request.id ?? null, { tools: toolDefinitions });
   }

@@ -1,6 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { ZodSchema } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import { toJSONSchema, type ZodSchema } from 'zod';
 
 import { JsonRpcRequestSchema, type JsonRpcId, type JsonRpcRequest } from './types.js';
 
@@ -66,30 +65,9 @@ export function sendJsonRpcResponse(
   res.end(JSON.stringify(jsonResponse));
 }
 
-function normalizeSchema(schema: object): object {
-  if ('$ref' in schema && 'definitions' in schema) {
-    const { $ref, definitions } = schema as {
-      $ref: string;
-      definitions: Record<string, unknown>;
-    };
-
-    const refKey = $ref.replace('#/definitions/', '');
-    const resolved = definitions?.[refKey];
-
-    if (resolved && typeof resolved === 'object') {
-      return resolved;
-    }
-  }
-
-  return schema;
-}
-
-export function zodSchemaToToolSchema(toolName: string, schema: ZodSchema): object {
-  const jsonSchema = zodToJsonSchema(schema, {
-    target: 'jsonSchema7',
-    name: toolName,
+export function zodSchemaToToolSchema(schema: ZodSchema): object {
+  return toJSONSchema(schema, {
+    target: 'draft-7',
+    io: 'input',
   });
-
-  const normalized = normalizeSchema(jsonSchema);
-  return normalized;
 }
