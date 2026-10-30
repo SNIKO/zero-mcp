@@ -16,7 +16,7 @@ The official `@modelcontextprotocol/sdk` ships with **significant overhead**—b
 
 **What Zero MCP delivers instead:**
 
-- **2 dependencies total** – Just `zod` and `zod-to-json-schema`; nothing else pollutes your `node_modules`
+- **1 runtime dependency** – Just `zod`, including its built-in JSON Schema conversion
 - **Native performance** – Built-in `node:http` server with zero middleware overhead; ideal for serverless and edge runtimes
 - **Instant start** – Instantiate `McpServer`, register tools, call `start()`—no Express config or transport plumbing
 - **Zod-first schemas** – Define tool inputs with Zod; JSON Schema generation happens automatically
@@ -32,7 +32,7 @@ Choose the official SDK if you need the full MCP spec (stdio transports, prompts
 npm install zero-mcp zod
 ```
 
-`zero-mcp` re-exports `z`, but keeping an explicit `zod` dependency avoids bundler surprises.
+`zero-mcp` re-exports `z`, but keeping an explicit `zod` dependency avoids bundler surprises. Starting with zero-mcp 0.3.0, use Zod 4 schemas; Zod 3 schemas are no longer supported. Tool input schemas are generated as JSON Schema draft-7 using Zod's input representation, including defaults and inputs to transforms.
 
 ## Minimal server example
 
@@ -126,6 +126,14 @@ npm run example
 ```
 
 This builds the library, compiles the example, and starts listening on `http://localhost:3005/mcp`.
+
+## Development
+
+Install dependencies with `pnpm install --frozen-lockfile`. The repository's `.npmrc` selects the public npm registry (`https://registry.npmjs.org/`) for npm and pnpm. ESLint 10 requires Node.js 20.19+, 22.13+, or 24+; this development requirement does not change the library's Node.js 18+ runtime requirement.
+
+Run `pnpm run lint`, `pnpm run build`, `pnpm exec tsc -p tsconfig.example.json`, and `pnpm exec eslint .` to check the library and example.
+
+TypeScript is kept on 6.0.3 because the latest stable typescript-eslint supports TypeScript versions below 6.1, not TypeScript 7.
 
 ## License
 

@@ -70,7 +70,7 @@ export const JsonRpcRequestSchema = z.object({
   jsonrpc: z.literal('2.0'),
   id: z.union([z.string(), z.number()]).optional(),
   method: z.string(),
-  params: z.union([z.record(z.unknown()), z.array(z.unknown())]).optional(),
+  params: z.union([z.record(z.string(), z.unknown()), z.array(z.unknown())]).optional(),
 });
 
 export type JsonRpcRequest = z.infer<typeof JsonRpcRequestSchema>;
@@ -81,12 +81,12 @@ export const InitializeParamsSchema = z.object({
     name: z.string().min(1, 'clientInfo.name is required'),
     version: z.string().min(1, 'clientInfo.version is required'),
   }),
-  capabilities: z.record(z.unknown()).optional(),
+  capabilities: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const CallToolParamsSchema = z.object({
   name: z.string().min(1, 'Tool name is required'),
-  arguments: z.record(z.unknown()).optional(),
+  arguments: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type CallToolParams = z.infer<typeof CallToolParamsSchema>;
