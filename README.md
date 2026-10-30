@@ -32,7 +32,7 @@ Choose the official SDK if you need the full MCP spec (stdio transports, prompts
 npm install zero-mcp zod
 ```
 
-`zero-mcp` re-exports `z`, but keeping an explicit `zod` dependency avoids bundler surprises. Use Zod 4 schemas; Zod 3 schemas are no longer supported. Tool input schemas are generated as JSON Schema draft-7 using Zod's input representation, including defaults and inputs to transforms.
+`zero-mcp` re-exports `z`, but keeping an explicit `zod` dependency avoids bundler surprises. Starting with zero-mcp 0.3.0, use Zod 4 schemas; Zod 3 schemas are no longer supported. Tool input schemas are generated as JSON Schema draft-7 using Zod's input representation, including defaults and inputs to transforms.
 
 ## Minimal server example
 
